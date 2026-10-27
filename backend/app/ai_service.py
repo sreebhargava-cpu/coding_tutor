@@ -565,3 +565,86 @@ Return ONLY JSON:
         edge_cases=cases,
         socratic_challenge_question="If an unexpected boundary value arrives, does your code handle it gracefully or raise an unhandled exception?"
     )
+
+
+# ==============================================================================
+# 6. CUSTOM PROBLEM GENERATION (Section 4)
+# ==============================================================================
+
+def generate_custom_problem(user_prompt: str) -> Optional[Dict[str, Any]]:
+    """Generates a complete, validated Python coding challenge from natural language prompt."""
+    client = get_gemini_client()
+    if not client:
+        return None
+
+    system_instruction = (
+        "You are an expert curriculum designer and Python challenge creator. "
+        "Create an engaging, clean, functional Python coding challenge based on the student's request. "
+        "CRITICAL REQUIREMENTS:\n"
+        "1. Starter code MUST define the function signature correctly.\n"
+        "2. Provide at least 3 valid test cases (input list and expected output).\n"
+        "3. Provide exactly 3 progressive hints (gentle nudge -> directional clue -> concrete direction).\n"
+        "4. Return strictly valid JSON."
+    )
+
+    prompt = f"""
+Create a Python coding challenge based on this description:
+"{user_prompt}"
+
+Return ONLY a JSON object matching this exact structure:
+{{
+  "title": "Descriptive Challenge Title",
+  "difficulty": "Beginner",
+  "category": "Loops, Strings, Lists, etc.",
+  "description": "### Problem Statement\\nDetailed markdown explanation of the task, arguments, and return value.",
+  "learning_objective": "Key Python programming concepts practiced",
+  "function_name": "function_name",
+  "starter_code": "def function_name(arg):\\n    # Your implementation here\\n    pass\\n",
+  "test_cases": [
+    {{"input": ["example"], "expected": "output", "is_hidden": false, "explanation": "Normal case"}},
+    {{"input": [""], "expected": "output", "is_hidden": false, "explanation": "Empty boundary case"}},
+    {{"input": ["extra"], "expected": "output", "is_hidden": true, "explanation": "Hidden test case"}}
+  ],
+  "solution_approach": "Brief outline of how to solve this problem correctly.",
+  "edge_cases": [
+    {{"name": "Empty input", "input_example": "''", "why_important": "Boundary check", "what_could_go_wrong": "IndexError"}}
+  ],
+  "hints": [
+    "Level 1 hint: gentle nudge about the core concept",
+    "Level 2 hint: directional clue focusing on variables or loops",
+    "Level 3 hint: concrete suggestion without giving full answer"
+  ]
+}}
+"""
+
+    raw_response = call_gemini(prompt, system_instruction=system_instruction)
+    parsed = extract_json(raw_response) if raw_response else None
+
+    if not parsed or not isinstance(parsed, dict):
+        return None
+
+    # Structural validation
+    required_keys = ["title", "description", "function_name", "starter_code", "test_cases"]
+    for k in required_keys:
+        if k not in parsed or not parsed[k]:
+            return None
+
+    if not isinstance(parsed.get("test_cases"), list) or len(parsed["test_cases"]) < 2:
+        return None
+
+    # Ensure difficulty is one of Beginner, Intermediate, Advanced
+    diff = parsed.get("difficulty", "Beginner")
+    if diff not in ["Beginner", "Intermediate", "Advanced"]:
+        diff = "Beginner"
+    parsed["difficulty"] = diff
+
+    # Ensure 3 hints exist
+    hints = parsed.get("hints", [])
+    if not isinstance(hints, list) or len(hints) < 3:
+        parsed["hints"] = [
+            f"Think carefully about what {parsed['function_name']} needs to accomplish.",
+            "Trace what happens to your inputs step by step.",
+            f"Check your return value and edge conditions for {parsed['function_name']}."
+        ]
+
+    return parsed

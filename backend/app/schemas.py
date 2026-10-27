@@ -17,6 +17,7 @@ class ProblemBase(BaseModel):
     category: str
     learning_objective: str
     order_index: int = 0
+    is_preset: bool = True
 
 class ProblemSummary(ProblemBase):
     is_solved: bool = False
@@ -31,10 +32,28 @@ class ProblemDetail(ProblemBase):
     function_name: str
     test_cases: List[TestCaseItem]
     edge_cases: Optional[List[Dict[str, Any]]] = None
+    hints: Optional[List[str]] = None
     is_solved: bool = False
 
     class Config:
         from_attributes = True
+
+class CustomProblemGenerateRequest(BaseModel):
+    description: str
+
+class CustomProblemSaveRequest(BaseModel):
+    id: Optional[str] = None
+    title: str
+    difficulty: str = "Beginner"
+    category: str = "Custom"
+    description: str
+    learning_objective: str
+    starter_code: str
+    function_name: str
+    test_cases: List[TestCaseItem]
+    solution_approach: Optional[str] = ""
+    edge_cases: Optional[List[Dict[str, Any]]] = None
+    hints: Optional[List[str]] = None
 
 class TestResultDetail(BaseModel):
     test_index: int
@@ -152,7 +171,9 @@ class ProgressSummaryResponse(BaseModel):
     problems_attempted: int
     problems_solved: int
     total_problems: int
-    success_rate_percent: float
+    completion_rate_percent: float
+    attempt_success_rate_percent: float
+    success_rate_percent: float # Kept for backward compatibility
     total_attempts: int
     common_difficulties: List[DifficultyStat]
     recurring_weaknesses: List[str]
