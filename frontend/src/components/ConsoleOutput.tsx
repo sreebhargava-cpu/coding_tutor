@@ -52,10 +52,22 @@ export const ConsoleOutput: React.FC<ConsoleOutputProps> = ({
       {/* Result Status Header Bar */}
       <div className="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          {isPassed && (
+          {isPassed && result.test_results && result.test_results.length > 0 && (
             <div className="flex items-center space-x-1.5 text-emerald-400 text-xs font-semibold">
               <CheckCircle className="h-4 w-4" />
               <span>All Test Cases Passed ({result.passed_tests}/{result.total_tests})</span>
+            </div>
+          )}
+          {isPassed && (!result.test_results || result.test_results.length === 0) && (
+            <div className="flex items-center space-x-1.5 text-emerald-400 text-xs font-semibold">
+              <CheckCircle className="h-4 w-4" />
+              <span>Script Executed Successfully</span>
+            </div>
+          )}
+          {result.status === 'timeout' && (
+            <div className="flex items-center space-x-1.5 text-amber-400 text-xs font-semibold">
+              <Clock className="h-4 w-4" />
+              <span>Execution Timed Out (Infinite loop protection)</span>
             </div>
           )}
           {isWrongAnswer && (

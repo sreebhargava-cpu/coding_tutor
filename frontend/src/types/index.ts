@@ -14,6 +14,7 @@ export interface ProblemSummary {
   order_index: number;
   is_solved: boolean;
   attempt_count: number;
+  is_preset?: boolean;
 }
 
 export interface EdgeCasePredefined {
@@ -29,6 +30,8 @@ export interface ProblemDetail extends ProblemSummary {
   function_name: string;
   test_cases: TestCase[];
   edge_cases?: EdgeCasePredefined[];
+  hints?: string[];
+  is_preset?: boolean;
 }
 
 export interface TestResultDetail {
@@ -127,6 +130,8 @@ export interface ProgressSummary {
   problems_attempted: number;
   problems_solved: number;
   total_problems: number;
+  completion_rate_percent?: number;
+  attempt_success_rate_percent?: number;
   success_rate_percent: number;
   total_attempts: number;
   common_difficulties: DifficultyStat[];

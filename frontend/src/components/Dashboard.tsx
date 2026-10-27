@@ -105,7 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectProblem, onReturnT
       </div>
 
       {/* KPI Metric Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {/* Solved Problems */}
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center space-x-3.5">
           <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -120,14 +120,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectProblem, onReturnT
           </div>
         </div>
 
-        {/* Success Rate */}
+        {/* Completion Rate */}
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center space-x-3.5">
           <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
             <Target className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-[11px] font-medium text-slate-400">Curriculum Rate</div>
-            <div className="text-xl font-bold text-white">{summary.success_rate_percent}%</div>
+            <div className="text-[11px] font-medium text-slate-400">Completion Rate</div>
+            <div className="text-xl font-bold text-white">
+              {summary.completion_rate_percent !== undefined ? summary.completion_rate_percent : summary.success_rate_percent}%
+            </div>
+            <div className="text-[10px] text-slate-500">Solved / Total problems</div>
+          </div>
+        </div>
+
+        {/* Attempt Success Rate */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm flex items-center space-x-3.5">
+          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <CheckCircle2 className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-medium text-slate-400">Attempt Success Rate</div>
+            <div className="text-xl font-bold text-white">
+              {summary.attempt_success_rate_percent !== undefined ? summary.attempt_success_rate_percent : 0}%
+            </div>
+            <div className="text-[10px] text-slate-500">Passed / Total runs</div>
           </div>
         </div>
 
