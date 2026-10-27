@@ -30,6 +30,5 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Python cache files
-__pycache__/
-*.py[cod]
+# Local application database
+coding_tutor.db
