@@ -269,3 +269,169 @@ serialize_res(res)
     };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Run with Input — script-style execution with mocked stdin
+// ---------------------------------------------------------------------------
+
+export interface ScriptExecutionResult {
+  status: 'success' | 'runtime_error' | 'syntax_error' | 'timeout';
+  stdout: string;
+  stderr: string;
+  error_type?: string;
+  error_message?: string;
+  error_line?: number;
+  execution_time_ms: number;
+}
+
+const MAX_OUTPUT_CHARS = 50000;
+const EXECUTION_TIMEOUT_MS = 10000;
+
+export async function runWithInput(
+  userCode: string,
+  userInput: string
+): Promise<ScriptExecutionResult> {
+  const startTime = performance.now();
+
+  let pyodide: any;
+  try {
+    pyodide = await getPyodide();
+  } catch (err: any) {
+    return {
+      status: 'runtime_error',
+      stdout: '',
+      stderr: 'Pyodide not available.',
+      error_type: 'PyodideError',
+      error_message: err.message || String(err),
+      execution_time_ms: 0,
+    };
+  }
+
+  // Prepare input lines
+  const inputLines = userInput.split('\n');
+  const inputLinesJson = JSON.stringify(inputLines);
+
+  const script = `
+import sys
+import io
+import traceback
+
+# Mock stdin with provided lines
+_input_lines = ${inputLinesJson}
+_input_iter = iter(_input_lines)
+
+def _mock_input(prompt=""):
+    try:
+        return next(_input_iter)
+    except StopIteration:
+        raise EOFError("No more input lines available")
+
+# Capture stdout/stderr
+_stdout_buf = io.StringIO()
+_stderr_buf = io.StringIO()
+_old_stdout = sys.stdout
+_old_stderr = sys.stderr
+sys.stdout = _stdout_buf
+sys.stderr = _stderr_buf
+
+_exec_error = None
+_error_type = None
+_error_msg = None
+_error_line = None
+
+_student_globals = {"input": _mock_input, "__builtins__": __builtins__}
+
+try:
+    exec(compile(${JSON.stringify(userCode)}, '<student_code>', 'exec'), _student_globals)
+except SyntaxError as se:
+    _error_type = "SyntaxError"
+    _error_msg = str(se.msg) + (f" (line {se.lineno})" if se.lineno else "")
+    _error_line = se.lineno
+    _exec_error = "SyntaxError"
+except EOFError as e:
+    _error_type = "EOFError"
+    _error_msg = str(e)
+    _exec_error = "EOFError"
+except Exception as e:
+    _error_type = type(e).__name__
+    _error_msg = str(e)
+    tb = traceback.extract_tb(sys.exc_info()[2])
+    for frame in tb:
+        if frame.filename == '<student_code>':
+            _error_line = frame.lineno
+            break
+    _exec_error = _error_type
+finally:
+    sys.stdout = _old_stdout
+    sys.stderr = _old_stderr
+
+import json
+_out = _stdout_buf.getvalue()
+_err = _stderr_buf.getvalue()
+
+# Limit output
+if len(_out) > ${MAX_OUTPUT_CHARS}:
+    _out = _out[:${MAX_OUTPUT_CHARS}] + "\\n[Output truncated — exceeded ${MAX_OUTPUT_CHARS} characters]"
+
+json.dumps({
+    "exec_error": _exec_error,
+    "error_type": _error_type,
+    "error_msg": _error_msg,
+    "error_line": _error_line,
+    "stdout": _out,
+    "stderr": _err
+})
+`;
+
+  try {
+    // Run with timeout using Promise.race
+    const runPromise = pyodide.runPythonAsync(script);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('TIMEOUT')), EXECUTION_TIMEOUT_MS)
+    );
+
+    const resultRaw = await Promise.race([runPromise, timeoutPromise]);
+    const result = JSON.parse(resultRaw);
+    const elapsed = Math.round(performance.now() - startTime);
+
+    if (result.exec_error) {
+      const isSyntax = result.error_type === 'SyntaxError';
+      return {
+        status: isSyntax ? 'syntax_error' : 'runtime_error',
+        stdout: result.stdout || '',
+        stderr: result.stderr || '',
+        error_type: result.error_type,
+        error_message: result.error_msg,
+        error_line: result.error_line,
+        execution_time_ms: elapsed,
+      };
+    }
+
+    return {
+      status: 'success',
+      stdout: result.stdout || '',
+      stderr: result.stderr || '',
+      execution_time_ms: elapsed,
+    };
+  } catch (err: any) {
+    const elapsed = Math.round(performance.now() - startTime);
+    if (err.message === 'TIMEOUT') {
+      return {
+        status: 'timeout',
+        stdout: '',
+        stderr: '',
+        error_type: 'TimeoutError',
+        error_message: `Execution timed out after ${EXECUTION_TIMEOUT_MS / 1000} seconds. Check for infinite loops.`,
+        execution_time_ms: elapsed,
+      };
+    }
+    return {
+      status: 'runtime_error',
+      stdout: '',
+      stderr: String(err),
+      error_type: 'ExecutionError',
+      error_message: err.message || String(err),
+      execution_time_ms: elapsed,
+    };
+  }
+}

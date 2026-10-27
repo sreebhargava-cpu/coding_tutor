@@ -20,7 +20,7 @@ import {
   recordAttempt,
   fetchProgressSummary
 } from './services/apiService';
-import { getPyodide, executeAndTestCode } from './services/pyodideService';
+import { getPyodide, executeAndTestCode, runWithInput, ScriptExecutionResult } from './services/pyodideService';
 import { Navbar } from './components/Navbar';
 import { ProblemDescription } from './components/ProblemDescription';
 import { CodeEditor } from './components/CodeEditor';
@@ -31,15 +31,20 @@ import { QualityFeedbackModal } from './components/QualityFeedbackModal';
 import { EdgeCaseModal } from './components/EdgeCaseModal';
 import { ExplainErrorModal } from './components/ExplainErrorModal';
 import { Dashboard } from './components/Dashboard';
+import { HomePage } from './components/HomePage';
 
 export function App() {
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
-  const [currentProblemId, setCurrentProblemId] = useState<string>('');
+
+  const savedLastId = localStorage.getItem('lastProblemId') || '';
+  const [currentProblemId, setCurrentProblemId] = useState<string>(savedLastId);
   const [currentProblem, setCurrentProblem] = useState<ProblemDetail | null>(null);
   const [loadingProblem, setLoadingProblem] = useState<boolean>(true);
 
   const [studentCode, setStudentCode] = useState<string>('');
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
+  const [scriptResult, setScriptResult] = useState<ScriptExecutionResult | null>(null);
+  const [activeRunMode, setActiveRunMode] = useState<'test' | 'script'>('test');
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isPyodideReady, setIsPyodideReady] = useState<boolean>(false);
 
@@ -52,7 +57,7 @@ export function App() {
   const [recurringWeaknesses, setRecurringWeaknesses] = useState<string[]>([]);
 
   // Navigation View
-  const [activeView, setActiveView] = useState<'workspace' | 'dashboard'>('workspace');
+  const [activeView, setActiveView] = useState<'home' | 'workspace' | 'dashboard'>('home');
 
   // Modals state
   const [conceptModalOpen, setConceptModalOpen] = useState<boolean>(false);
@@ -79,18 +84,27 @@ export function App() {
       .catch((err) => console.error('Failed to preload Pyodide', err));
   }, []);
 
+  // Helper: select a problem and persist to localStorage
+  const handleSelectProblem = useCallback((id: string) => {
+    setCurrentProblemId(id);
+    localStorage.setItem('lastProblemId', id);
+  }, []);
+
   // Fetch problem list on start
   const loadProblemList = useCallback(async () => {
     try {
       const list = await fetchProblems();
       setProblems(list);
-      if (list.length > 0 && !currentProblemId) {
-        setCurrentProblemId(list[0].id);
+      const savedId = localStorage.getItem('lastProblemId');
+      if (list.length > 0 && !currentProblemId && !savedId) {
+        handleSelectProblem(list[0].id);
+      } else if (savedId && !currentProblemId) {
+        setCurrentProblemId(savedId);
       }
     } catch (err) {
       console.error('Failed to load problem list', err);
     }
-  }, [currentProblemId]);
+  }, [currentProblemId, handleSelectProblem]);
 
   useEffect(() => {
     loadProblemList();
@@ -106,7 +120,15 @@ export function App() {
       .then((detail) => {
         if (!isMounted) return;
         setCurrentProblem(detail);
-        setStudentCode(detail.starter_code);
+
+        // Restore saved code or use starter code
+        const savedCode = localStorage.getItem(`lastCode_${currentProblemId}`);
+        if (savedCode && savedCode !== detail.starter_code) {
+          setStudentCode(savedCode);
+        } else {
+          setStudentCode(detail.starter_code);
+        }
+
         setExecutionResult(null);
         setHint(null);
         setHintLevel(1);
@@ -123,12 +145,49 @@ export function App() {
     };
   }, [currentProblemId]);
 
+  // Autosave student code (debounced 1s)
+  useEffect(() => {
+    if (!currentProblemId || !studentCode) return;
+    const t = setTimeout(() => {
+      localStorage.setItem(`lastCode_${currentProblemId}`, studentCode);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [studentCode, currentProblemId]);
+
   // Refresh weakness tracking on mount
   useEffect(() => {
     fetchProgressSummary()
       .then((summary) => setRecurringWeaknesses(summary.recurring_weaknesses))
       .catch((err) => console.error('Failed to fetch summary', err));
   }, []);
+
+
+  // Run Script with custom input
+  const handleRunWithInput = async (userInput: string) => {
+    setIsRunning(true);
+    setActiveRunMode('script');
+
+    try {
+      const res = await runWithInput(studentCode, userInput);
+      setScriptResult(res);
+      setExecutionResult({
+        status: res.status === 'success' ? 'passed' : res.status as any,
+        error_type: res.error_type,
+        error_message: res.error_message,
+        error_line: res.error_line,
+        stdout: res.stdout,
+        stderr: res.stderr,
+        passed_tests: res.status === 'success' ? 1 : 0,
+        total_tests: 1,
+        test_results: [],
+        execution_time_ms: res.execution_time_ms,
+      });
+    } catch (err) {
+      console.error('Script execution failed', err);
+    } finally {
+      setIsRunning(false);
+    }
+  };
 
   // Run Code with Pyodide
   const handleRunCode = async () => {
@@ -285,7 +344,7 @@ export function App() {
       <Navbar
         problems={problems}
         currentProblemId={currentProblemId}
-        onSelectProblem={(id) => setCurrentProblemId(id)}
+        onSelectProblem={handleSelectProblem}
         activeView={activeView}
         setActiveView={setActiveView}
         isPyodideReady={isPyodideReady}
@@ -293,10 +352,19 @@ export function App() {
 
       {/* Main View Area */}
       <main className="flex-1 overflow-hidden relative">
-        {activeView === 'dashboard' ? (
+        {activeView === 'home' ? (
+          <HomePage
+            problems={problems}
+            onStartProblem={(id) => { handleSelectProblem(id); setActiveView('workspace'); }}
+            onGoToAnalytics={() => setActiveView('dashboard')}
+            onRefreshProblems={loadProblemList}
+            lastProblemId={localStorage.getItem('lastProblemId')}
+            lastProblemCode={null}
+          />
+        ) : activeView === 'dashboard' ? (
           <Dashboard
             onSelectProblem={(id) => {
-              setCurrentProblemId(id);
+              handleSelectProblem(id);
               setActiveView('workspace');
             }}
             onReturnToWorkspace={() => setActiveView('workspace')}
@@ -316,6 +384,7 @@ export function App() {
                   code={studentCode}
                   onChange={(val) => setStudentCode(val)}
                   onRun={handleRunCode}
+                  onRunWithInput={handleRunWithInput}
                   onReset={handleResetCode}
                   isRunning={isRunning}
                   onExplainSelection={handleExplainSelection}

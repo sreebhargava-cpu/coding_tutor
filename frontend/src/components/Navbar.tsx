@@ -7,15 +7,16 @@ import {
   CheckCircle2, 
   Layers, 
   Bot, 
-  Cpu
+  Cpu,
+  Home
 } from 'lucide-react';
 
 interface NavbarProps {
   problems: ProblemSummary[];
   currentProblemId: string;
   onSelectProblem: (id: string) => void;
-  activeView: 'workspace' | 'dashboard';
-  setActiveView: (view: 'workspace' | 'dashboard') => void;
+  activeView: 'home' | 'workspace' | 'dashboard';
+  setActiveView: (view: 'home' | 'workspace' | 'dashboard') => void;
   isPyodideReady: boolean;
 }
 
@@ -47,28 +48,30 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Problem Selector Dropdown */}
-      <div className="flex items-center space-x-2">
-        <label className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
-          <Layers className="h-3.5 w-3.5 text-slate-500" /> Problem:
-        </label>
-        <select
-          value={currentProblemId}
-          onChange={(e) => onSelectProblem(e.target.value)}
-          className="bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs rounded-lg border border-slate-700 px-3 py-1.5 font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition"
-        >
-          {problems.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.is_solved ? '✓ ' : ''}{p.title} ({p.difficulty})
-            </option>
-          ))}
-        </select>
-        {currentProblem?.is_solved && (
-          <span className="flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
-            <CheckCircle2 className="h-3 w-3" /> Solved
-          </span>
-        )}
-      </div>
+      {/* Problem Selector Dropdown — only in workspace view */}
+      {activeView === 'workspace' && (
+        <div className="flex items-center space-x-2">
+          <label className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
+            <Layers className="h-3.5 w-3.5 text-slate-500" /> Problem:
+          </label>
+          <select
+            value={currentProblemId}
+            onChange={(e) => onSelectProblem(e.target.value)}
+            className="bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs rounded-lg border border-slate-700 px-3 py-1.5 font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition"
+          >
+            {problems.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.is_solved ? '✓ ' : ''}{p.title} ({p.difficulty})
+              </option>
+            ))}
+          </select>
+          {currentProblem?.is_solved && (
+            <span className="flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
+              <CheckCircle2 className="h-3 w-3" /> Solved
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Navigation Tabs & Statuses */}
       <div className="flex items-center space-x-3">
@@ -88,6 +91,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* View Switcher Tabs */}
         <div className="flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+          <button
+            onClick={() => setActiveView('home')}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+              activeView === 'home'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Home className="h-3.5 w-3.5" />
+            <span>Home</span>
+          </button>
           <button
             onClick={() => setActiveView('workspace')}
             className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${

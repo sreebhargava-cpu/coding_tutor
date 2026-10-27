@@ -126,6 +126,51 @@ export const ProblemDescription: React.FC<ProblemDescriptionProps> = ({ problem,
             ))}
         </div>
       </div>
+
+      {/* 3 Progressive Hints Section */}
+      {problem.hints && problem.hints.length > 0 && (
+        <HintsAccordion hints={problem.hints} />
+      )}
+
     </div>
   );
 };
+
+interface HintsAccordionProps {
+  hints: string[];
+}
+
+const HintsAccordion: React.FC<HintsAccordionProps> = ({ hints }) => {
+  const [revealedCount, setRevealedCount] = React.useState<number>(0);
+
+  const titles = ["Hint 1: Conceptual Nudge", "Hint 2: Directional Clue", "Hint 3: Concrete Direction"];
+
+  return (
+    <div className="mt-4 pt-3 border-t border-slate-800 space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+          <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
+          Curated Hints ({revealedCount}/{hints.length})
+        </h4>
+        {revealedCount < hints.length && (
+          <button
+            onClick={() => setRevealedCount((prev) => Math.min(hints.length, prev + 1))}
+            className="text-[11px] px-2 py-0.5 rounded bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 border border-indigo-500/40 transition font-medium"
+          >
+            {revealedCount === 0 ? "Show Hint 1" : "Show Next Hint"}
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {hints.slice(0, revealedCount).map((hintText, idx) => (
+          <div key={idx} className="p-2.5 rounded-lg bg-indigo-950/20 border border-indigo-900/40 text-xs space-y-1">
+            <span className="text-[11px] font-semibold text-indigo-400 block">{titles[idx] || `Hint ${idx + 1}`}</span>
+            <p className="text-slate-300 leading-relaxed">{hintText}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+

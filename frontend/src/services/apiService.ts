@@ -163,3 +163,48 @@ export async function resetProgress(): Promise<{ status: string }> {
   if (!res.ok) throw new Error('Failed to reset progress');
   return res.json();
 }
+
+
+export async function fetchApiStatus(): Promise<{ gemini_available: boolean }> {
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) return { gemini_available: false };
+    return res.json();
+  } catch {
+    return { gemini_available: false };
+  }
+}
+
+export async function generateCustomProblem(description: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/problems/custom/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to generate custom problem');
+  }
+  return res.json();
+}
+
+export async function saveCustomProblem(problem: any): Promise<{ status: string; id: string; title: string }> {
+  const res = await fetch(`${API_BASE}/problems/custom/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(problem),
+  });
+  if (!res.ok) throw new Error('Failed to save custom problem');
+  return res.json();
+}
+
+export async function deleteCustomProblem(problemId: string): Promise<{ status: string; message: string; deleted_attempts_count: number }> {
+  const res = await fetch(`${API_BASE}/problems/${problemId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to delete problem');
+  }
+  return res.json();
+}

@@ -18,6 +18,8 @@ class Problem(Base):
     solution_approach = Column(Text, nullable=False) # Context for AI tutor
     edge_cases = Column(Text, nullable=True)         # JSON string of edge cases
     order_index = Column(Integer, default=0)
+    is_preset = Column(Boolean, default=True)
+    hints = Column(Text, nullable=True)              # JSON string: array of 3 hint strings
 
     attempts = relationship("Attempt", back_populates="problem", cascade="all, delete-orphan")
 

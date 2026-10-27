@@ -37,17 +37,47 @@ def get_socratic_hint(payload: HintRequest, db: Session = Depends(get_db)):
 
     exec_dict = payload.execution_result.dict() if payload.execution_result else None
 
-    # Socratic Adaptive Hint generation
-    response = generate_socratic_hint(
-        problem_title=problem.title,
-        problem_desc=problem.description,
-        learning_obj=problem.learning_objective,
-        student_code=payload.code,
-        execution_result=exec_dict,
-        hint_level=payload.current_hint_level,
-        previous_hints=payload.previous_hints,
-        student_weaknesses=weakness_names
-    )
+    # Check if Gemini API is available
+    from ..ai_service import get_gemini_client
+    gemini_client = get_gemini_client()
+
+    # If Gemini is offline/unavailable:
+    if not gemini_client:
+        # Check if preset problem with curated hints
+        stored_hints = json.loads(problem.hints) if problem.hints else []
+        if stored_hints and getattr(problem, "is_preset", True):
+            level = max(1, min(3, payload.current_hint_level))
+            hint_idx = level - 1
+            hint_text = stored_hints[hint_idx] if hint_idx < len(stored_hints) else stored_hints[-1]
+            titles = {1: "Curated Nudge", 2: "Focused Direction", 3: "Specific Clue"}
+            response = HintResponse(
+                bug_category="preset_curated",
+                hint_level=level,
+                hint_title=titles.get(level, f"Curated Hint {level}"),
+                socratic_question="Have you considered how this step relates to the problem rules?",
+                hint_body=hint_text,
+                targeted_line=None,
+                should_reveal_solution=False,
+                next_hint_available=(level < len(stored_hints))
+            )
+        else:
+            # Custom problem offline: honest explanation, do not fake
+            raise HTTPException(
+                status_code=503,
+                detail="AI Tutoring is currently offline. AI-generated coaching is unavailable for custom problems without Gemini connection."
+            )
+    else:
+        # Socratic Adaptive Hint generation via Gemini
+        response = generate_socratic_hint(
+            problem_title=problem.title,
+            problem_desc=problem.description,
+            learning_obj=problem.learning_objective,
+            student_code=payload.code,
+            execution_result=exec_dict,
+            hint_level=payload.current_hint_level,
+            previous_hints=payload.previous_hints,
+            student_weaknesses=weakness_names
+        )
 
     # Record tutor interaction
     interaction = TutorInteraction(

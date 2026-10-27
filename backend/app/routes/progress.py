@@ -70,7 +70,9 @@ def get_progress_summary(db: Session = Depends(get_db)):
     solved_ids = db.query(Attempt.problem_id).filter(Attempt.is_solved == True).distinct().all()
     problems_solved = len(solved_ids)
 
-    success_rate = (problems_solved / total_problems * 100) if total_problems > 0 else 0.0
+    completion_rate = (problems_solved / total_problems * 100) if total_problems > 0 else 0.0
+    successful_attempts = db.query(Attempt).filter(Attempt.is_solved == True).count()
+    attempt_success_rate = (successful_attempts / total_attempts * 100) if total_attempts > 0 else 0.0
 
     # Common difficulties breakdown
     weaknesses = db.query(Weakness).order_by(Weakness.mistake_count.desc()).all()
@@ -122,7 +124,9 @@ def get_progress_summary(db: Session = Depends(get_db)):
         problems_attempted=problems_attempted,
         problems_solved=problems_solved,
         total_problems=total_problems,
-        success_rate_percent=round(success_rate, 1),
+        completion_rate_percent=round(completion_rate, 1),
+        attempt_success_rate_percent=round(attempt_success_rate, 1),
+        success_rate_percent=round(completion_rate, 1),
         total_attempts=total_attempts,
         common_difficulties=difficulty_stats,
         recurring_weaknesses=top_weaknesses,
